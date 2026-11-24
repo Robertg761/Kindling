@@ -85,23 +85,31 @@ async function readBounded(response: Response): Promise<string> {
   return text;
 }
 
-async function github(path: string, fetchImpl: FetchLike, accept = "application/vnd.github+json") {
-  let response: Response;
+async function request(url: string, fetchImpl: FetchLike, accept: string, auth: Record<string, string>) {
   try {
-    response = await fetchImpl(`${API}${path}`, {
-      headers: {
-        Accept: accept,
-        "User-Agent": "kindling-repo-check",
-        "X-GitHub-Api-Version": "2022-11-28",
-        ...authHeaders(),
-      },
+    return await fetchImpl(url, {
+      headers: { Accept: accept, "User-Agent": "kindling-repo-check", "X-GitHub-Api-Version": "2022-11-28", ...auth },
       signal: AbortSignal.timeout(TIMEOUT_MS),
       cache: "no-store",
     });
   } catch {
     throw new GitHubError(503, "network");
   }
+}
+
+async function github(path: string, fetchImpl: FetchLike, accept = "application/vnd.github+json") {
+  const url = `${API}${path}`;
+  const auth = authHeaders();
+  let response = await request(url, fetchImpl, accept, auth);
+  // GitHub can answer 401/404 when it doesn't accept the credentials for an endpoint.
+  // Public data doesn't need them, so retry once without.
+  if (Object.keys(auth).length && (response.status === 401 || response.status === 404)) {
+    const status = response.status;
+    response = await request(url, fetchImpl, accept, {});
+    if (response.ok && status === 401) console.warn("Kindling: GitHub rejected API credentials; using unauthenticated requests.");
+  }
   if (response.status === 404) return null;
+  if (!response.ok) console.warn(`Kindling: GitHub API ${response.status} for ${path}`);
   if (response.status === 429 || (response.status === 403 && response.headers.get("x-ratelimit-remaining") === "0")) {
     throw new GitHubError(429, "rate limited");
   }

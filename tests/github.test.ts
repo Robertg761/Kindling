@@ -95,3 +95,20 @@ describe("verifyRepository", () => {
     expect(!res.ok && res.reason).toContain("rate-limiting");
   });
 });
+
+describe("credential fallback", () => {
+  it("retries without credentials when GitHub rejects them", async () => {
+    process.env.GITHUB_ID = "id";
+    process.env.GITHUB_SECRET = "secret";
+    const inner = fakeGitHub(baseRepo, { "Octo/Widget/.github/FUNDING.yml": "github: octo" });
+    const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      if (headers.Authorization) return new Response("", { status: 404 });
+      return inner(input, init);
+    }) as typeof fetch;
+    const res = await verifyRepository("octo/widget", { now: NOW, fetchImpl });
+    delete process.env.GITHUB_ID;
+    delete process.env.GITHUB_SECRET;
+    expect(res.ok).toBe(true);
+  });
+});
