@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Project } from "@/db/schema";
+import { formatUsd } from "@/lib/money";
 import { formatMonth } from "@/lib/month";
 import { Avatar, FundingButtons, Match, projectHref, projectMeta } from "./ui";
 
@@ -11,26 +12,30 @@ export function PickCover({
   month,
   voteMonth,
   voteCount,
+  amountCents,
   reasons,
   linkTitle = true,
   as: Tag = "h1",
+  compact = false,
 }: {
   project: Project;
   month: string;
   voteMonth: string;
   voteCount: number;
+  amountCents: number;
   reasons: Reason[];
   linkTitle?: boolean;
   as?: "h1" | "h2";
+  compact?: boolean;
 }) {
   return (
-    <section className="matchbook" aria-labelledby="pick-name">
+    <section className={`matchbook${compact ? " compact" : ""}`} aria-labelledby={`pick-${project.id}`}>
       <div className="strip" aria-hidden="true" />
       <div className="matchbook-body">
         <p className="matchbook-month">
-          <Match lit size={28} /> {formatMonth(month)}&apos;s Kindling Pick
+          <Match lit size={28} /> {formatMonth(month)}&apos;s Kindling Pick{amountCents > 0 && `, ${formatUsd(amountCents)}`}
         </p>
-        <Tag id="pick-name">
+        <Tag id={`pick-${project.id}`}>
           <span className="owner">{project.owner}/</span>
           {linkTitle ? (
             <Link href={projectHref(project)} style={{ textDecoration: "none" }}>
@@ -44,7 +49,10 @@ export function PickCover({
         <p className="meta small">{projectMeta(project)}</p>
         <FundingButtons links={project.fundingLinks} size="lg" />
         <p className="picked-by small">
-          Picked with {voteCount} vote{voteCount === 1 ? "" : "s"} in {formatMonth(voteMonth)}. Donations go straight to the project.
+          Picked {amountCents > 0 ? "by subscribers " : ""}with {voteCount} vote{voteCount === 1 ? "" : "s"} in {formatMonth(voteMonth)}.{" "}
+          {amountCents > 0
+            ? `It gets ${formatUsd(amountCents)} from the Kindling pot, paid through Open Collective. Your own donations go straight to the project.`
+            : "Donations go straight to the project."}
         </p>
         {reasons.length > 0 && (
           <ul className="reasons">

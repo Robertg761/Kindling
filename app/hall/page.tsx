@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getDb, isDatabaseConfigured } from "@/db";
 import { getHallOfFame } from "@/lib/core";
+import { formatUsd } from "@/lib/money";
 import { formatMonth } from "@/lib/month";
 import { EntryName, Matches } from "@/components/ui";
 
@@ -14,7 +15,7 @@ export default async function HallPage() {
       <div className="measure">
         <h1>Past picks</h1>
         <p className="muted" style={{ fontSize: "var(--step-1)" }}>
-          Every project the community has picked, newest first.
+          Every project subscribers have picked, newest first.
         </p>
       </div>
       {picks.length === 0 ? (
@@ -34,6 +35,7 @@ export default async function HallPage() {
                 <Matches count={pick.voteCount} max={8} size={28} />
                 <span className="count">
                   {pick.voteCount} vote{pick.voteCount === 1 ? "" : "s"}
+                  {pick.amountCents > 0 && <>, <span className="prize">{formatUsd(pick.amountCents)}</span></>}
                 </span>
               </div>
             </li>

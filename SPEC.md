@@ -4,18 +4,20 @@
 
 ## What it is
 
-A site where the community nominates open-source projects, votes once a month, and the winner becomes **the Kindling Pick** for the next month. The site sends attention and donations straight to the winner's existing funding page (GitHub Sponsors, Open Collective, Ko-fi, Liberapay, Buy Me a Coffee, Polar).
+A site where the community nominates open-source projects and subscribers vote once a month on who gets the pot. Every $200 in the pot picks another winner.
 
-**Kindling never touches money.** There's no checkout, no ledger, no payouts and no balances. If a feature needs us to hold or move funds, it's out of scope.
+## Money model (decided Nov 24, 2026)
 
-## The one rule
-
-v1 ships before any new docs, charters, decision records or "phases" get written. Real users decide what v2 needs.
+- **Kindling never holds money itself.** Kindling is a collective on Open Collective with a fiscal host (Open Source Collective). Subscribers pay the collective; the host holds the money and pays winners through public expenses. Kindling only reads the balance and subscriptions.
+- **Subscription:** $5 USD a month minimum, pay more if you like. Only subscribers can vote; every vote counts the same.
+- **Winners:** at closing, pot = collective balance (after card and host fees) − money already owed (unpaid prizes and operator shares) − the operator's 5% of the month's income after fees. Every $200 in the pot is one winner, taken from the top of the vote. Anything under $200 rolls over. Ties at the cutoff go to whoever reached their count first.
+- **Operator share:** Robert keeps 5% of income after fees for running Kindling, paid as a public expense and disclosed on the site. Reviewed at 200 subscribers, with a month's notice before any change.
+- **Practice mode:** until `KINDLING_OC_SLUG` is set, any signed-in member (GitHub account 30+ days old) can vote and the single top project is picked with no prize.
 
 ## Users
 
 - **Visitors**: browse nominees, see the current Kindling Pick, click through to donate. No account needed.
-- **Members**: sign in with GitHub to nominate and vote.
+- **Members**: sign in with GitHub to nominate. Subscribers (who link their Open Collective profile) vote.
 - **Operator** (Robert): approves or removes nominations and closes the monthly vote.
 
 ## Core flows
@@ -26,7 +28,7 @@ v1 ships before any new docs, charters, decision records or "phases" get written
    - has at least one funding link, read from `.github/FUNDING.yml` (or the owner's GitHub Sponsors profile)
 
    If it passes, the nomination waits for operator approval. If it fails, show the specific reason.
-2. **Vote.** Each member gets **one vote per month** and can change it until the vote closes. Equal weight for everyone, and no way to buy votes.
+2. **Vote.** Each subscriber gets **one vote per month** and can change it until the vote closes. Equal weight for everyone regardless of how much they pay.
 3. **Close the month.** On the 1st (Vercel Cron, or a manual operator button), the project with the most votes becomes the Kindling Pick. Ties go to whoever reached that count first. Nominees that didn't win carry over to next month with their votes reset.
 4. **Kindling Pick page.** A big feature of the winner with its description, stars, recent activity, a "why people voted" list (optional one-line reasons left with votes), and prominent buttons for each funding link.
 5. **Hall of Fame.** A list of past Kindling Picks with month and vote count.
@@ -60,7 +62,7 @@ Next.js (App Router) + TypeScript, Auth.js with GitHub OAuth, Neon Postgres + Dr
 
 ## Out of scope for v1
 
-Payments of any kind, AI compute grants, cash awards, random draws, contributor balances, email notifications, multiple currencies, teams or orgs, comments.
+Kindling processing payments itself, AI compute grants, random draws, contributor balances, email notifications, currencies other than USD, teams or orgs, comments.
 
 ## Done means
 

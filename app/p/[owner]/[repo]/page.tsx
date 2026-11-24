@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDb, isDatabaseConfigured } from "@/db";
 import { getCurrentUser, isAuthConfigured, isOperator } from "@/lib/auth";
-import { accountOldEnough, getPicksForProject, getProjectBySlug, getUserVote, getVoteCount, getVoteReasons, isVoteClosed } from "@/lib/core";
+import { getPicksForProject, getProjectBySlug, getUserVote, getVoteCount, getVoteReasons, isVoteClosed } from "@/lib/core";
+import { currentVoterSlugs, subscriptionStatus, votingEligibility } from "@/lib/eligibility";
+import { formatUsd } from "@/lib/money";
+import Link from "next/link";
 import { formatMonth, monthOf, nextMonth } from "@/lib/month";
 import { SignInButton } from "@/components/AuthButtons";
 import { PickCover } from "@/components/PickCover";
@@ -36,17 +39,19 @@ export default async function ProjectPage({ params, searchParams }: Props) {
 
   const now = new Date();
   const month = monthOf(now);
+  const voterSlugs = await currentVoterSlugs().catch(() => null);
   const [pickRows, votes, myVote, closed] = await Promise.all([
     getPicksForProject(db, project.id),
-    getVoteCount(db, project.id, month),
+    getVoteCount(db, project.id, month, voterSlugs),
     user ? getUserVote(db, user.id, month) : null,
     isVoteClosed(db, month),
   ]);
   const latestPick = pickRows[0];
   const reasons = latestPick ? await getVoteReasons(db, project.id, latestPick.voteMonth) : [];
   const onBallot = project.status === "approved" && !latestPick;
-  const canVote = Boolean(user && onBallot && !closed && accountOldEnough(user, now));
-  const mine = myVote?.projectId === project.id;
+  const eligible = user && onBallot && !closed ? votingEligibility(user, await subscriptionStatus(user), now) : null;
+  const canVote = eligible === true;
+  const mine = canVote && myVote?.projectId === project.id;
   const githubUrl = `https://github.com/${encodeURIComponent(project.owner)}/${encodeURIComponent(project.name)}`;
 
   return (
@@ -70,6 +75,7 @@ export default async function ProjectPage({ params, searchParams }: Props) {
           month={latestPick.month}
           voteMonth={latestPick.voteMonth}
           voteCount={latestPick.voteCount}
+          amountCents={latestPick.amountCents}
           reasons={reasons}
           linkTitle={false}
         />
@@ -90,6 +96,9 @@ export default async function ProjectPage({ params, searchParams }: Props) {
           See it on GitHub
         </a>
         {pickRows.length > 1 && <span className="muted"> Also picked in {pickRows.slice(1).map((p) => formatMonth(p.month)).join(", ")}.</span>}
+        {latestPick && latestPick.amountCents > 0 && (
+          <span className="muted"> {latestPick.paidAt ? `The ${formatUsd(latestPick.amountCents)} prize has been paid.` : `The ${formatUsd(latestPick.amountCents)} prize is being paid out through Open Collective.`}</span>
+        )}
       </p>
 
       {onBallot && (
@@ -99,11 +108,18 @@ export default async function ProjectPage({ params, searchParams }: Props) {
             <h2 id="vote-title">Vote for {formatMonth(nextMonth(month))}</h2>
             <p>
               {votes === 0 ? "No votes yet." : `${votes} vote${votes === 1 ? "" : "s"} so far.`}{" "}
-              {closed ? "This month's vote is closed." : "One vote each per month."}
+              {closed ? "This month's vote is closed." : "One vote per subscriber per month."}
             </p>
           </div>
           {canVote ? (
             <VoteForm projectId={project.id} isMyVote={mine} myReason={mine ? myVote?.reason : null} />
+          ) : typeof eligible === "string" ? (
+            <div className="stack" style={{ alignItems: "flex-end", maxWidth: 360 }}>
+              <span className="small muted" style={{ textAlign: "right" }}>{eligible}</span>
+              <Link href="/subscribe" className="btn btn-outline btn-sm">
+                Subscribe and link
+              </Link>
+            </div>
           ) : !user && isAuthConfigured() && !closed ? (
             <SignInButton label="Sign in to vote" />
           ) : (

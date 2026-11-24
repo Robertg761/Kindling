@@ -139,6 +139,10 @@ h3 { font-size: var(--step-2); }
 .matchbook .picked-by { margin: 22px 0 0; color: #aeb8c6; }
 
 .funding { display: flex; gap: 10px; flex-wrap: wrap; }
+.matchbook.compact .matchbook-body { padding: clamp(20px, 3vw, 32px); }
+.matchbook.compact h2 { font-size: var(--step-4); }
+.matchbook.compact .description { font-size: var(--step-0); margin-top: 10px; }
+.matchbook.compact .funding { margin-top: 18px; }
 
 .reasons { list-style: none; margin: 28px 0 0; padding: 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .reasons li { display: flex; gap: 10px; align-items: flex-start; }
@@ -241,4 +245,27 @@ h3 { font-size: var(--step-2); }
   .input-sm { flex: 1; width: auto; }
   .vote-panel { grid-template-columns: 1fr; }
   .hall li { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+}
+
+/* ---------- Pot ---------- */
+.pot { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px 48px; align-items: center; padding: 28px 0; border-top: 2px solid var(--ink); border-bottom: 1px solid var(--rule); margin-top: 56px; }
+.pot p { margin: 6px 0 0; color: var(--ink-2); max-width: 60ch; }
+.pot-figure { font-size: var(--step-4); margin: 0; }
+.pot-bar { height: 14px; margin: 16px 0 10px; max-width: 520px; border-radius: 2px; background: var(--paper-2); border: 1px solid var(--rule); overflow: hidden; }
+.pot-bar span { display: block; height: 100%; background: repeating-linear-gradient(-60deg, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px 6px), var(--striker); }
+.pot-cta { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.vote-gate { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding: 16px 0; border-bottom: 1px solid var(--rule); }
+.vote-gate p { margin: 0; max-width: 60ch; }
+.picks-stack { display: grid; gap: 20px; }
+.prize { font-weight: 600; color: var(--red); }
+.money-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: var(--step--1); }
+.money-table th, .money-table td { text-align: left; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--rule); }
+.money-table th { color: var(--ink-2); font-weight: 600; }
+.money-table td.num, .money-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.steps { padding-left: 1.3em; }
+.steps li { margin-bottom: 1.2em; }
+.steps li::marker { font-family: var(--display); font-weight: 800; font-size: var(--step-1); }
+@media (max-width: 760px) {
+  .pot { grid-template-columns: 1fr; }
+  .money-table { display: block; overflow-x: auto; }
 }

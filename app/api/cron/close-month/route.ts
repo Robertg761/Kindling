@@ -2,7 +2,9 @@ import { timingSafeEqual } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { getDb } from "@/db";
-import { closeVoting } from "@/lib/core";
+import { closeVoting, isVoteClosed } from "@/lib/core";
+import { clearOpenCollectiveCache, collectiveSlug, getFunding } from "@/lib/opencollective";
+import { currentVoterSlugs } from "@/lib/eligibility";
 import { monthOf, previousMonth } from "@/lib/month";
 
 export const dynamic = "force-dynamic";
@@ -17,19 +19,39 @@ function authorized(request: Request) {
   return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
-/** Vercel Cron calls this on the 1st of each month to close the previous month's vote. */
+/**
+ * Vercel Cron calls this daily. It closes last month's vote if that hasn't happened yet, so a
+ * failed run (say, Open Collective being down) is retried the next day.
+ */
 export async function GET(request: Request) {
   if (!authorized(request)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const voteMonth = previousMonth(monthOf(new Date()));
-  const outcome = await closeVoting(getDb(), voteMonth);
+  const db = getDb();
+  if (await isVoteClosed(db, voteMonth)) return NextResponse.json({ voteMonth, status: "already-closed" });
+
+  const slug = collectiveSlug();
+  let funding = null;
+  let voterSlugs: string[] | null = null;
+  if (slug) {
+    try {
+      funding = await getFunding(slug, voteMonth, { fresh: true });
+      clearOpenCollectiveCache();
+      voterSlugs = await currentVoterSlugs();
+    } catch (error) {
+      console.error("Kindling cron: couldn't read Open Collective", error);
+      return NextResponse.json({ voteMonth, status: "retry-later" }, { status: 503 });
+    }
+  }
+  const outcome = await closeVoting(db, voteMonth, funding, voterSlugs);
   revalidatePath("/");
   revalidatePath("/hall");
   return NextResponse.json({
     voteMonth,
     status: outcome.status,
-    ...(outcome.status === "picked" && {
-      project: `${outcome.project.owner}/${outcome.project.name}`,
-      votes: outcome.pick.voteCount,
+    ...(outcome.status === "closed" && {
+      funded: outcome.round.funded,
+      potCents: outcome.round.potCents,
+      winners: outcome.winners.map((w) => `${w.project.owner}/${w.project.name}`),
     }),
   });
 }

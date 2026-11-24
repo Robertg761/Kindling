@@ -3,12 +3,26 @@ import { notFound } from "next/navigation";
 import { getDb, isDatabaseConfigured } from "@/db";
 import type { Project } from "@/db/schema";
 import { getCurrentUser, isAuthConfigured, isOperator } from "@/lib/auth";
-import { getBallot, getPickByVoteMonth, getUsersByIds, listProjectsByStatus, type PickWithProject } from "@/lib/core";
+import {
+  getBallot,
+  getRound,
+  getRounds,
+  getUsersByIds,
+  listProjectsByStatus,
+  listUnpaidOperatorShares,
+  listUnpaidPicks,
+  outstandingCents,
+  type PickWithProject,
+} from "@/lib/core";
+import { breakdown, formatUsd, OPERATOR_SHARE_PERCENT } from "@/lib/money";
+import { currentVoterSlugs } from "@/lib/eligibility";
 import { formatMonth, monthOf, nextMonth, previousMonth } from "@/lib/month";
-import { approveAction, removeAction, restoreAction } from "../actions";
+import { collectiveSlug, collectiveUrl, getFunding, OpenCollectiveError } from "@/lib/opencollective";
+import { approveAction, markOperatorSharePaidAction, markPickPaidAction, removeAction, restoreAction } from "../actions";
 import { SignInButton } from "@/components/AuthButtons";
 import { CloseMonthForm } from "@/components/CloseMonthForm";
-import { Avatar, EntryName, FundingButtons, SetupNotice, projectMeta } from "@/components/ui";
+import { OcCheckForm } from "@/components/OcCheckForm";
+import { Avatar, EntryName, FundingButtons, SetupNotice, projectHref, projectMeta } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
@@ -29,39 +43,83 @@ export default async function AdminPage() {
   const db = getDb();
   const month = monthOf(new Date());
   const lastMonth = previousMonth(month);
-  const [pending, approved, removed, ballot, currentPick, lastPick] = await Promise.all([
+  const slug = collectiveSlug();
+  const voterSlugs = await currentVoterSlugs().catch(() => null);
+  const [pending, approved, removed, ballot, current, last, unpaidPicks, unpaidShares, rounds, owed] = await Promise.all([
     listProjectsByStatus(db, "pending"),
     listProjectsByStatus(db, "approved"),
     listProjectsByStatus(db, "removed"),
-    getBallot(db, month),
-    getPickByVoteMonth(db, month),
-    getPickByVoteMonth(db, lastMonth),
+    getBallot(db, month, voterSlugs),
+    getRound(db, month),
+    getRound(db, lastMonth),
+    listUnpaidPicks(db),
+    listUnpaidOperatorShares(db),
+    getRounds(db),
+    outstandingCents(db),
   ]);
-  const nominators = new Map(
-    (await getUsersByIds(db, [...new Set(pending.map((p) => p.nominatedBy).filter((id): id is number => id !== null))])).map((u) => [u.id, u.login]),
-  );
+  const nominatorIds = [...new Set(pending.map((p) => p.nominatedBy).filter((id): id is number => id !== null))];
+  const nominators = new Map((await getUsersByIds(db, nominatorIds)).map((u) => [u.id, u.login]));
   const leader = ballot[0];
+
+  let live = null;
+  let liveError: string | null = null;
+  if (slug) {
+    try {
+      live = breakdown(await getFunding(slug, month), owed);
+    } catch (error) {
+      liveError = error instanceof OpenCollectiveError ? error.message : String(error);
+    }
+  }
 
   return (
     <>
       <h1>Admin</h1>
 
       <section className="section">
+        <h2>Money</h2>
+        <div className="panel stack">
+          {!slug ? (
+            <p style={{ margin: 0 }}>
+              <strong>Practice mode.</strong> Set <code>KINDLING_OC_SLUG</code> in Vercel to your collective&apos;s slug to turn on
+              subscriber-only voting and prizes. Use the check below to make sure Kindling can read it first.
+            </p>
+          ) : live ? (
+            <table className="money-table">
+              <tbody>
+                <tr><td>Collective balance (after card and host fees)</td><td className="num">{formatUsd(live.balanceCents)}</td></tr>
+                <tr><td>Already owed (unpaid prizes and your unpaid shares)</td><td className="num">−{formatUsd(live.outstandingCents)}</td></tr>
+                <tr><td>Your {OPERATOR_SHARE_PERCENT}% of {formatMonth(month)} so far</td><td className="num">−{formatUsd(live.operatorShareCents)}</td></tr>
+                <tr><td><strong>Pot if {formatMonth(month)} closed now</strong></td><td className="num"><strong>{formatUsd(live.potCents)}</strong></td></tr>
+                <tr><td>Winners it would fund</td><td className="num">{live.slots}</td></tr>
+              </tbody>
+            </table>
+          ) : (
+            <p className="notice notice-error">Couldn&apos;t read {slug} from Open Collective: {liveError}</p>
+          )}
+          {slug && (
+            <p className="small muted" style={{ margin: 0 }}>
+              Collective: <a href={collectiveUrl() ?? "#"} target="_blank" rel="noopener noreferrer">opencollective.com/{slug}</a>
+            </p>
+          )}
+          <OcCheckForm defaultSlug={slug ?? "eslint"} />
+        </div>
+      </section>
+
+      <section className="section">
         <h2>Monthly vote</h2>
         <div className="panel stack">
-          {lastPick ? (
-            <PickResult voteMonth={lastMonth} pick={lastPick} />
+          {last ? (
+            <RoundResult voteMonth={lastMonth} winners={last.winners} potCents={last.round.potCents} funded={last.round.funded} />
           ) : (
             <div className="stack">
               <p style={{ margin: 0 }}>
-                <strong>{formatMonth(lastMonth)}</strong> hasn&apos;t been closed. The cron job normally does this on the
-                1st.
+                <strong>{formatMonth(lastMonth)}</strong> hasn&apos;t been closed. The daily job normally does this on the 1st.
               </p>
               <CloseMonthForm month={lastMonth} label={`Close ${formatMonth(lastMonth)} now`} />
             </div>
           )}
-          {currentPick ? (
-            <PickResult voteMonth={month} pick={currentPick} />
+          {current ? (
+            <RoundResult voteMonth={month} winners={current.winners} potCents={current.round.potCents} funded={current.round.funded} />
           ) : (
             <div className="stack">
               <p style={{ margin: 0 }}>
@@ -74,12 +132,84 @@ export default async function AdminPage() {
               <CloseMonthForm
                 month={month}
                 label={`Close ${formatMonth(month)} early`}
-                confirmText={`Close ${formatMonth(month)} now? The leader becomes the ${formatMonth(nextMonth(month))} pick and nobody can vote until the 1st.`}
+                confirmText={`Close ${formatMonth(month)} now? Winners are decided from today's pot and nobody can vote until the 1st.`}
               />
             </div>
           )}
         </div>
       </section>
+
+      <section className="section">
+        <h2>Payouts to make</h2>
+        {unpaidPicks.length === 0 && unpaidShares.length === 0 ? (
+          <p className="muted">Nothing owed right now.</p>
+        ) : (
+          <>
+            <p className="muted measure">
+              Pay these through Open Collective expenses, then mark them paid here so the pot stops setting the money aside.
+            </p>
+            <table className="money-table">
+              <thead>
+                <tr><th>For</th><th>Who</th><th className="num">Amount</th><th /></tr>
+              </thead>
+              <tbody>
+                {unpaidPicks.map((p) => (
+                  <tr key={`pick-${p.id}`}>
+                    <td>{formatMonth(p.month)} prize</td>
+                    <td><a href={projectHref(p.project)}>{p.project.owner}/{p.project.name}</a></td>
+                    <td className="num">{formatUsd(p.amountCents)}</td>
+                    <td className="num">
+                      <form action={markPickPaidAction}>
+                        <input type="hidden" name="pickId" value={p.id} />
+                        <button className="btn btn-outline btn-sm">Mark paid</button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+                {unpaidShares.map((r) => (
+                  <tr key={`share-${r.id}`}>
+                    <td>{formatMonth(r.voteMonth)} operating share ({OPERATOR_SHARE_PERCENT}%)</td>
+                    <td>You</td>
+                    <td className="num">{formatUsd(r.operatorShareCents)}</td>
+                    <td className="num">
+                      <form action={markOperatorSharePaidAction}>
+                        <input type="hidden" name="roundId" value={r.id} />
+                        <button className="btn btn-outline btn-sm">Mark paid</button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </section>
+
+      {rounds.length > 0 && (
+        <section className="section">
+          <h2>Past rounds</h2>
+          <table className="money-table">
+            <thead>
+              <tr>
+                <th>Vote month</th><th className="num">Balance</th><th className="num">Owed</th><th className="num">Your share</th>
+                <th className="num">Pot</th><th className="num">Winners</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rounds.map((r) => (
+                <tr key={r.id}>
+                  <td>{formatMonth(r.voteMonth)}{!r.funded && " (practice)"}</td>
+                  <td className="num">{formatUsd(r.balanceCents)}</td>
+                  <td className="num">{formatUsd(r.outstandingCents)}</td>
+                  <td className="num">{formatUsd(r.operatorShareCents)}</td>
+                  <td className="num">{formatUsd(r.potCents)}</td>
+                  <td className="num">{r.winners}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       <AdminList title={`Waiting for approval (${pending.length})`} projects={pending} empty="Nothing waiting." nominators={nominators}>
         {(p) => (
@@ -119,11 +249,16 @@ export default async function AdminPage() {
   );
 }
 
-function PickResult({ voteMonth, pick }: { voteMonth: string; pick: PickWithProject }) {
+function RoundResult({ voteMonth, winners, potCents, funded }: { voteMonth: string; winners: PickWithProject[]; potCents: number; funded: boolean }) {
+  const names = winners.map((w) => `${w.project.owner}/${w.project.name}`).join(", ");
   return (
     <p style={{ margin: 0 }}>
-      <strong>{formatMonth(voteMonth)}</strong> is closed. {pick.project.owner}/{pick.project.name} won with {pick.voteCount} vote
-      {pick.voteCount === 1 ? "" : "s"} and is the Kindling Pick for {formatMonth(pick.month)}.
+      <strong>{formatMonth(voteMonth)}</strong> is closed.{" "}
+      {winners.length === 0
+        ? funded
+          ? `No winners; ${formatUsd(potCents)} rolled over.`
+          : "Nobody voted."
+        : `${names} ${winners.length === 1 ? "is" : "are"} the Kindling Pick${winners.length === 1 ? "" : "s"} for ${formatMonth(nextMonth(voteMonth))}${funded ? `, ${formatUsd(winners[0].amountCents)} each` : ""}.`}
     </p>
   );
 }

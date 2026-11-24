@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, gte, inArray, isNotNull, lt, notInArray, sql } from "drizzle-orm";
-import { picks, projects, users, votes, type PickRow, type Project, type User } from "@/db/schema";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, notInArray, sql } from "drizzle-orm";
+import { picks, projects, rounds, users, votes, type PickRow, type Project, type Round, type User } from "@/db/schema";
 import type { Db } from "@/db/types";
 import type { VerifiedRepo } from "./github";
+import { breakdown, PRIZE_CENTS, type FundingSnapshot } from "./money";
 import { monthOf, nextMonth, type Month } from "./month";
 
 export const MIN_ACCOUNT_AGE_DAYS = 30;
@@ -146,13 +147,18 @@ export async function isPastWinner(db: Db, projectId: number): Promise<boolean> 
 
 export type BallotEntry = Project & { votes: number };
 
-/** Approved projects that can be voted on, with this month's vote counts, most votes first. */
-export async function getBallot(db: Db, month: Month): Promise<BallotEntry[]> {
+/**
+ * Approved projects that can be voted on, with this month's vote counts, most votes first.
+ * With `voterSlugs`, only votes from members whose linked Open Collective profile is in the list
+ * count (current subscribers). Without it, every vote counts (practice mode).
+ */
+export async function getBallot(db: Db, month: Month, voterSlugs?: string[] | null): Promise<BallotEntry[]> {
   const winners = await pastWinnerIds(db);
   const counts = db
     .select({ projectId: votes.projectId, n: sql<number>`count(*)::int`.as("n") })
     .from(votes)
-    .where(eq(votes.month, month))
+    .innerJoin(users, eq(users.id, votes.userId))
+    .where(and(eq(votes.month, month), voterFilter(voterSlugs)))
     .groupBy(votes.projectId)
     .as("counts");
   const rows = await db
@@ -164,11 +170,18 @@ export async function getBallot(db: Db, month: Month): Promise<BallotEntry[]> {
   return rows.map((r) => ({ ...r.project, votes: r.votes }));
 }
 
-export async function getVoteCount(db: Db, projectId: number, month: Month): Promise<number> {
+function voterFilter(voterSlugs?: string[] | null) {
+  if (!voterSlugs) return undefined;
+  if (voterSlugs.length === 0) return sql`false`;
+  return inArray(sql`lower(${users.ocSlug})`, voterSlugs.map((s) => s.toLowerCase()));
+}
+
+export async function getVoteCount(db: Db, projectId: number, month: Month, voterSlugs?: string[] | null): Promise<number> {
   const [row] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(votes)
-    .where(and(eq(votes.projectId, projectId), eq(votes.month, month)));
+    .innerJoin(users, eq(users.id, votes.userId))
+    .where(and(eq(votes.projectId, projectId), eq(votes.month, month), voterFilter(voterSlugs)));
   return row?.n ?? 0;
 }
 
@@ -182,19 +195,21 @@ export async function getUserVote(db: Db, userId: number, month: Month) {
 }
 
 export async function isVoteClosed(db: Db, month: Month): Promise<boolean> {
-  const [row] = await db.select({ id: picks.id }).from(picks).where(eq(picks.voteMonth, month)).limit(1);
+  const [row] = await db.select({ id: rounds.id }).from(rounds).where(eq(rounds.voteMonth, month)).limit(1);
   return Boolean(row);
 }
 
+/**
+ * Records a vote. `eligible` is decided by the caller (subscriber check, or account age in
+ * practice mode): pass true, or a sentence explaining why this member can't vote.
+ */
 export async function castVote(
   db: Db,
-  input: { user: User; projectId: number; reason?: string | null; now: Date },
+  input: { user: User; projectId: number; reason?: string | null; now: Date; eligible: true | string },
 ): Promise<Result<undefined>> {
   const { user, projectId, now } = input;
   const month = monthOf(now);
-  if (!accountOldEnough(user, now)) {
-    return fail(`GitHub accounts need to be at least ${MIN_ACCOUNT_AGE_DAYS} days old to vote. This keeps the vote fair.`);
-  }
+  if (input.eligible !== true) return fail(input.eligible);
   if (await isVoteClosed(db, month)) return fail("This month's vote is already closed. Voting reopens on the 1st.");
 
   const [project] = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
@@ -219,56 +234,147 @@ export async function withdrawVote(db: Db, input: { userId: number; now: Date })
   return ok(undefined);
 }
 
+// ---------- Money owed ----------
+
+/** Prizes and operator shares that were awarded but not yet paid out of the collective. */
+export async function outstandingCents(db: Db): Promise<number> {
+  const [prizes] = await db
+    .select({ n: sql<number>`coalesce(sum(${picks.amountCents}), 0)::int` })
+    .from(picks)
+    .where(isNull(picks.paidAt));
+  const [shares] = await db
+    .select({ n: sql<number>`coalesce(sum(${rounds.operatorShareCents}), 0)::int` })
+    .from(rounds)
+    .where(isNull(rounds.operatorPaidAt));
+  return (prizes?.n ?? 0) + (shares?.n ?? 0);
+}
+
+export async function listUnpaidPicks(db: Db): Promise<PickWithProject[]> {
+  const rows = await db
+    .select({ pick: picks, project: projects })
+    .from(picks)
+    .innerJoin(projects, eq(projects.id, picks.projectId))
+    .where(and(isNull(picks.paidAt), sql`${picks.amountCents} > 0`))
+    .orderBy(asc(picks.month), asc(picks.rank));
+  return rows.map((r) => ({ ...r.pick, project: r.project }));
+}
+
+export async function listUnpaidOperatorShares(db: Db): Promise<Round[]> {
+  return db
+    .select()
+    .from(rounds)
+    .where(and(isNull(rounds.operatorPaidAt), sql`${rounds.operatorShareCents} > 0`))
+    .orderBy(asc(rounds.voteMonth));
+}
+
+export async function markPickPaid(db: Db, pickId: number, now: Date) {
+  await db.update(picks).set({ paidAt: now }).where(and(eq(picks.id, pickId), isNull(picks.paidAt)));
+}
+
+export async function markOperatorSharePaid(db: Db, roundId: number, now: Date) {
+  await db.update(rounds).set({ operatorPaidAt: now }).where(and(eq(rounds.id, roundId), isNull(rounds.operatorPaidAt)));
+}
+
 // ---------- Closing the month ----------
 
 export type CloseOutcome =
-  | { status: "picked"; pick: PickRow; project: Project }
-  | { status: "already-closed"; pick: PickRow }
-  | { status: "no-votes" };
+  | { status: "closed"; round: Round; winners: PickWithProject[] }
+  | { status: "already-closed"; round: Round };
 
 /**
- * Closes the vote for `voteMonth`. The approved project with the most votes becomes
- * the Kindling Pick for the following month. Ties go to the project that reached its
- * final count first (its latest counted vote is the oldest). Safe to run twice.
+ * Closes the vote for `voteMonth`.
+ *
+ * Only votes from current subscribers count when funded (pass their Open Collective slugs), so
+ * a lapsed subscription, or a vote cast in practice mode by someone who never subscribed, doesn't.
+ *
+ * With funding (the Open Collective snapshot at closing time), every $200 left in the pot after
+ * money already owed and the operator's 5% becomes one winner, taken from the top of the vote.
+ * Ties go to the project that reached its final count first. Leftover money stays in the
+ * collective and rolls into next month. Without funding (practice mode, before the collective
+ * exists) the single most-voted project is picked with no prize.
+ *
+ * A round row is always written, so a month with no winners still records its rollover. Safe to
+ * run twice.
  */
-export async function closeVoting(db: Db, voteMonth: Month): Promise<CloseOutcome> {
+export async function closeVoting(
+  db: Db,
+  voteMonth: Month,
+  funding: FundingSnapshot | null,
+  /** With funding: Open Collective slugs of current subscribers. Only their votes count. */
+  voterSlugs: string[] | null = null,
+): Promise<CloseOutcome> {
   return db.transaction(async (tx) => {
-    const [existing] = await tx.select().from(picks).where(eq(picks.voteMonth, voteMonth)).limit(1);
-    if (existing) return { status: "already-closed", pick: existing } as const;
+    const [existing] = await tx.select().from(rounds).where(eq(rounds.voteMonth, voteMonth)).limit(1);
+    if (existing) return { status: "already-closed", round: existing } as const;
+
+    const owed = funding ? await outstandingCents(tx as unknown as Db) : 0;
+    const money = funding ? breakdown(funding, owed) : null;
+    const slots = money ? money.slots : 1;
 
     const winners = await tx.selectDistinct({ id: picks.projectId }).from(picks);
     const excluded = winners.map((w) => w.id);
-    const [top] = await tx
-      .select({
-        projectId: votes.projectId,
-        n: sql<number>`count(*)::int`,
-        reachedAt: sql<Date>`max(${votes.updatedAt})`,
-      })
-      .from(votes)
-      .innerJoin(projects, eq(projects.id, votes.projectId))
-      .where(
-        and(
-          eq(votes.month, voteMonth),
-          eq(projects.status, "approved"),
-          excluded.length ? notInArray(votes.projectId, excluded) : undefined,
-        ),
-      )
-      .groupBy(votes.projectId)
-      .orderBy(desc(sql`count(*)`), asc(sql`max(${votes.updatedAt})`), asc(votes.projectId))
-      .limit(1);
-    if (!top) return { status: "no-votes" } as const;
+    const ranked =
+      slots > 0
+        ? await tx
+            .select({ projectId: votes.projectId, n: sql<number>`count(*)::int` })
+            .from(votes)
+            .innerJoin(projects, eq(projects.id, votes.projectId))
+            .innerJoin(users, eq(users.id, votes.userId))
+            .where(
+              and(
+                eq(votes.month, voteMonth),
+                voterFilter(money ? voterSlugs : null),
+                eq(projects.status, "approved"),
+                excluded.length ? notInArray(votes.projectId, excluded) : undefined,
+              ),
+            )
+            .groupBy(votes.projectId)
+            .orderBy(desc(sql`count(*)`), asc(sql`max(${votes.updatedAt})`), asc(votes.projectId))
+            .limit(slots)
+        : [];
 
     const inserted = await tx
-      .insert(picks)
-      .values({ month: nextMonth(voteMonth), voteMonth, projectId: top.projectId, voteCount: top.n })
+      .insert(rounds)
+      .values({
+        voteMonth,
+        month: nextMonth(voteMonth),
+        funded: Boolean(money),
+        balanceCents: money?.balanceCents ?? 0,
+        outstandingCents: money?.outstandingCents ?? 0,
+        operatorShareCents: money?.operatorShareCents ?? 0,
+        potCents: money?.potCents ?? 0,
+        winners: ranked.length,
+      })
       .onConflictDoNothing()
       .returning();
     if (!inserted[0]) {
-      const [raced] = await tx.select().from(picks).where(eq(picks.voteMonth, voteMonth)).limit(1);
-      return { status: "already-closed", pick: raced } as const;
+      const [raced] = await tx.select().from(rounds).where(eq(rounds.voteMonth, voteMonth)).limit(1);
+      return { status: "already-closed", round: raced } as const;
     }
-    const [project] = await tx.select().from(projects).where(eq(projects.id, top.projectId)).limit(1);
-    return { status: "picked", pick: inserted[0], project } as const;
+
+    if (ranked.length) {
+      await tx.insert(picks).values(
+        ranked.map((r, i) => ({
+          month: nextMonth(voteMonth),
+          voteMonth,
+          projectId: r.projectId,
+          rank: i + 1,
+          voteCount: r.n,
+          amountCents: money ? PRIZE_CENTS : 0,
+        })),
+      );
+    }
+    const picked = await tx
+      .select({ pick: picks, project: projects })
+      .from(picks)
+      .innerJoin(projects, eq(projects.id, picks.projectId))
+      .where(eq(picks.voteMonth, voteMonth))
+      .orderBy(asc(picks.rank));
+    return {
+      status: "closed",
+      round: inserted[0],
+      winners: picked.map((r) => ({ ...r.pick, project: r.project })),
+    } as const;
   });
 }
 
@@ -276,16 +382,22 @@ export async function closeVoting(db: Db, voteMonth: Month): Promise<CloseOutcom
 
 export type PickWithProject = PickRow & { project: Project };
 
-/** The pick featured during `month`, or the most recent earlier one if a month had no votes. */
-export async function getFeaturedPick(db: Db, month: Month): Promise<PickWithProject | null> {
-  const [row] = await db
-    .select({ pick: picks, project: projects })
+/** The picks featured during `month`, or the most recent earlier ones if a month had no winners. */
+export async function getFeaturedPicks(db: Db, month: Month): Promise<PickWithProject[]> {
+  const [latest] = await db
+    .select({ month: picks.month })
     .from(picks)
-    .innerJoin(projects, eq(projects.id, picks.projectId))
     .where(sql`${picks.month} <= ${month}`)
     .orderBy(desc(picks.month))
     .limit(1);
-  return row ? { ...row.pick, project: row.project } : null;
+  if (!latest) return [];
+  const rows = await db
+    .select({ pick: picks, project: projects })
+    .from(picks)
+    .innerJoin(projects, eq(projects.id, picks.projectId))
+    .where(eq(picks.month, latest.month))
+    .orderBy(asc(picks.rank));
+  return rows.map((r) => ({ ...r.pick, project: r.project }));
 }
 
 export async function getHallOfFame(db: Db): Promise<PickWithProject[]> {
@@ -293,8 +405,24 @@ export async function getHallOfFame(db: Db): Promise<PickWithProject[]> {
     .select({ pick: picks, project: projects })
     .from(picks)
     .innerJoin(projects, eq(projects.id, picks.projectId))
-    .orderBy(desc(picks.month));
+    .orderBy(desc(picks.month), asc(picks.rank));
   return rows.map((r) => ({ ...r.pick, project: r.project }));
+}
+
+export async function getRounds(db: Db, limit = 12): Promise<Round[]> {
+  return db.select().from(rounds).orderBy(desc(rounds.voteMonth)).limit(limit);
+}
+
+export async function getRound(db: Db, voteMonth: Month): Promise<{ round: Round; winners: PickWithProject[] } | null> {
+  const [round] = await db.select().from(rounds).where(eq(rounds.voteMonth, voteMonth)).limit(1);
+  if (!round) return null;
+  const rows = await db
+    .select({ pick: picks, project: projects })
+    .from(picks)
+    .innerJoin(projects, eq(projects.id, picks.projectId))
+    .where(eq(picks.voteMonth, voteMonth))
+    .orderBy(asc(picks.rank));
+  return { round, winners: rows.map((r) => ({ ...r.pick, project: r.project })) };
 }
 
 export async function getPicksForProject(db: Db, projectId: number) {
@@ -317,12 +445,16 @@ export async function getUsersByIds(db: Db, ids: number[]) {
   return db.select().from(users).where(inArray(users.id, ids));
 }
 
-export async function getPickByVoteMonth(db: Db, voteMonth: Month): Promise<PickWithProject | null> {
-  const [row] = await db
-    .select({ pick: picks, project: projects })
-    .from(picks)
-    .innerJoin(projects, eq(projects.id, picks.projectId))
-    .where(eq(picks.voteMonth, voteMonth))
-    .limit(1);
-  return row ? { ...row.pick, project: row.project } : null;
+// ---------- Open Collective link ----------
+
+export async function linkOpenCollective(db: Db, userId: number, ocSlug: string | null, now: Date): Promise<Result<undefined>> {
+  if (ocSlug) {
+    const [taken] = await db.select({ id: users.id }).from(users).where(eq(users.ocSlug, ocSlug)).limit(1);
+    if (taken && taken.id !== userId) return fail("That Open Collective profile is already linked to another Kindling account.");
+  }
+  await db
+    .update(users)
+    .set({ ocSlug, ocLinkedAt: ocSlug ? now : null })
+    .where(eq(users.id, userId));
+  return ok(undefined);
 }

@@ -5,6 +5,7 @@ import "@fontsource-variable/instrument-sans";
 import { getCurrentUser, isAuthConfigured, isOperator } from "@/lib/auth";
 import { SignInButton, SignOutButton } from "@/components/AuthButtons";
 import { Wordmark } from "@/components/ui";
+import { OPERATOR_SHARE_PERCENT } from "@/lib/money";
 import "./globals.css";
 
 // The header shows who is signed in, so every page renders per request.
@@ -31,6 +32,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <nav className="nav" aria-label="Main">
               <Link href="/#vote">Vote</Link>
               <Link href="/nominate">Nominate</Link>
+              <Link href="/subscribe">Subscribe</Link>
               <Link href="/hall">Past picks</Link>
               <Link href="/about">How it works</Link>
               {isOperator(user) && <Link href="/admin">Admin</Link>}
@@ -55,7 +57,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <footer className="site-footer">
           <div className="striker" />
           <div className="container footer-inner">
-            <span>Kindling never touches the money. Every donate button goes straight to the project.</span>
+            <span>Subscriber money is held and paid out by Open Collective, in public. Kindling keeps {OPERATOR_SHARE_PERCENT}% after fees.</span>
             <span className="footer-links">
               <Link href="/about">How it works</Link>
               <Link href="/hall">Past picks</Link>
