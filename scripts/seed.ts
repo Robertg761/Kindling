@@ -1,4 +1,4 @@
-import "./env";
+import { poolConfig } from "./env";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "../src/db/schema";
@@ -13,7 +13,7 @@ if (!url || inputs.length === 0) {
   console.error("Usage: DATABASE_URL=... npm run seed -- owner/repo [owner/repo ...]");
   process.exit(1);
 }
-const pool = new Pool({ connectionString: url, ssl: /localhost|127\.0\.0\.1/.test(url) ? undefined : { rejectUnauthorized: true } });
+const pool = new Pool(poolConfig(url));
 const db = drizzle(pool, { schema }) as unknown as Db;
 
 for (const input of inputs) {

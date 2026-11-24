@@ -1,4 +1,4 @@
-import "./env";
+import { poolConfig } from "./env";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
@@ -13,7 +13,7 @@ if (!url) {
   console.error("DATABASE_URL is not set.");
   process.exit(1);
 }
-const pool = new Pool({ connectionString: url, ssl: /localhost|127\.0\.0\.1/.test(url) ? undefined : { rejectUnauthorized: true } });
+const pool = new Pool(poolConfig(url));
 await migrate(drizzle(pool), { migrationsFolder: "drizzle" });
 await pool.end();
 console.log("Database is up to date.");

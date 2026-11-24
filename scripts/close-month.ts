@@ -1,4 +1,4 @@
-import "./env";
+import { poolConfig } from "./env";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "../src/db/schema";
@@ -15,7 +15,7 @@ if (!url || !isMonth(month)) {
   console.error("Usage: DATABASE_URL=... npm run close-month [-- YYYY-MM]");
   process.exit(1);
 }
-const pool = new Pool({ connectionString: url, ssl: /localhost|127\.0\.0\.1/.test(url) ? undefined : { rejectUnauthorized: true } });
+const pool = new Pool(poolConfig(url));
 const slug = collectiveSlug();
 const funding = slug ? await getFunding(slug, month, { fresh: true }) : null;
 const voterSlugs = slug ? [...(await getSubscribers(slug))].filter(([, c]) => c >= BASE_PRICE_CENTS).map(([s]) => s) : null;
