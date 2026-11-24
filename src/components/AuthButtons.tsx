@@ -12,7 +12,7 @@ export function SignInButton({ label = "Sign in with GitHub", className = "btn b
 
 export function SignOutButton() {
   return (
-    <button type="button" className="btn btn-ghost btn-sm" onClick={() => signOut({ callbackUrl: "/" })}>
+    <button type="button" className="btn btn-quiet small" onClick={() => signOut({ callbackUrl: "/" })}>
       Sign out
     </button>
   );

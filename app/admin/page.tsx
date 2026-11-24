@@ -8,7 +8,7 @@ import { formatMonth, monthOf, nextMonth, previousMonth } from "@/lib/month";
 import { approveAction, removeAction, restoreAction } from "../actions";
 import { SignInButton } from "@/components/AuthButtons";
 import { CloseMonthForm } from "@/components/CloseMonthForm";
-import { Avatar, FundingButtons, ProjectMeta, ProjectTitle, SetupNotice } from "@/components/ui";
+import { Avatar, EntryName, FundingButtons, SetupNotice, projectMeta } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
@@ -18,8 +18,8 @@ export default async function AdminPage() {
   const user = await getCurrentUser();
   if (!user) {
     return (
-      <div className="card row" style={{ justifyContent: "space-between" }}>
-        <span>Operators sign in with GitHub.</span>
+      <div className="signin-bar">
+        <p>Operators sign in with GitHub.</p>
         {isAuthConfigured() && <SignInButton />}
       </div>
     );
@@ -44,12 +44,11 @@ export default async function AdminPage() {
 
   return (
     <>
-      <div className="eyebrow">Operator</div>
       <h1>Admin</h1>
 
       <section className="section">
         <h2>Monthly vote</h2>
-        <div className="card stack">
+        <div className="panel stack">
           {lastPick ? (
             <PickResult voteMonth={lastMonth} pick={lastPick} />
           ) : (
@@ -148,25 +147,25 @@ function AdminList({
       {projects.length === 0 ? (
         <p className="muted">{empty}</p>
       ) : (
-        <div className="admin-list">
+        <ul className="admin-list">
           {projects.map((p) => (
-            <article key={p.id} className="card admin-item">
+            <li key={p.id} className="admin-item">
               <div className="row" style={{ flex: 1, minWidth: 0, alignItems: "flex-start" }}>
                 <Avatar owner={p.owner} size={40} />
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <ProjectTitle project={p} />
+                  <EntryName project={p} />
                   {p.description && <p className="small muted" style={{ margin: "2px 0" }}>{p.description}</p>}
-                  <ProjectMeta project={p} />
+                  <p className="small muted" style={{ margin: "2px 0" }}>{projectMeta(p)}</p>
                   {nominators && p.nominatedBy && (
                     <p className="small muted" style={{ margin: "4px 0 0" }}>Nominated by {nominators.get(p.nominatedBy) ?? "unknown"}</p>
                   )}
-                  <FundingButtons links={p.fundingLinks} size="sm" />
+                  <FundingButtons links={p.fundingLinks} size="sm" quiet />
                 </div>
               </div>
               <div className="actions">{children(p)}</div>
-            </article>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </section>
   );

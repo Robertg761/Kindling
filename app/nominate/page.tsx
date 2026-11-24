@@ -19,11 +19,10 @@ export default async function NominatePage() {
 
   return (
     <div className="prose">
-      <div className="eyebrow">Nominate</div>
-      <h1>Know a project that deserves some fuel?</h1>
-      <p className="lede">Paste its GitHub link. We&apos;ll check it right away, then a person approves it for the ballot.</p>
+      <h1>Nominate a project</h1>
+      <p className="lede">Paste the GitHub link of a project you rely on. Kindling checks it right away, then a person approves it for the ballot.</p>
 
-      <div className="card section" style={{ marginTop: 24 }}>
+      <div className="panel" style={{ marginTop: 28 }}>
         {!user ? (
           isAuthConfigured() ? (
             <div className="row" style={{ justifyContent: "space-between" }}>
@@ -47,7 +46,7 @@ export default async function NominatePage() {
         )}
       </div>
 
-      <h2>What qualifies</h2>
+      <h2>What a project needs</h2>
       <ul>
         <li>A public GitHub repository that isn&apos;t a fork, archived or disabled</li>
         <li>At least one push in the last {ACTIVITY_WINDOW_DAYS} days</li>

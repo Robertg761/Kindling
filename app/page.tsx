@@ -4,12 +4,13 @@ import { getCurrentUser, isAuthConfigured } from "@/lib/auth";
 import { accountOldEnough, getBallot, getFeaturedPick, getUserVote, getVoteReasons, isVoteClosed } from "@/lib/core";
 import { formatMonth, monthOf, nextMonth, voteClosesAt } from "@/lib/month";
 import { SignInButton } from "@/components/AuthButtons";
+import { PickCover } from "@/components/PickCover";
 import { VoteForm } from "@/components/VoteForm";
-import { Avatar, FundingButtons, ProjectMeta, ProjectTitle, SetupNotice } from "@/components/ui";
+import { EntryName, Matches, SetupNotice, projectMeta } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-const closeFormat = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
+const dayFormat = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
 
 export default async function Home() {
   if (!isDatabaseConfigured()) {
@@ -34,56 +35,25 @@ export default async function Home() {
   const reasons = pick ? await getVoteReasons(db, pick.projectId, pick.voteMonth, 6) : [];
   const totalVotes = ballot.reduce((sum, p) => sum + p.votes, 0);
   const tooYoung = user ? !accountOldEnough(user, now) : false;
+  const next = formatMonth(nextMonth(month));
+  const closesOn = dayFormat.format(voteClosesAt(month));
 
   return (
     <>
       {pick ? (
-        <section className="card pick" aria-labelledby="pick-title">
-          <div className="eyebrow">
-            Kindling Pick · {formatMonth(pick.month)}
-            {pick.month !== month && " (no pick this month yet)"}
-          </div>
-          <div className="pick-head">
-            <Avatar owner={pick.project.owner} size={64} />
-            <div>
-              <ProjectTitle project={pick.project} as="h1" />
-              <ProjectMeta project={pick.project} />
-            </div>
-          </div>
-          {pick.project.description && <p className="description">{pick.project.description}</p>}
-          <p className="muted small">
-            Chosen by {pick.voteCount} vote{pick.voteCount === 1 ? "" : "s"} in {formatMonth(pick.voteMonth)}. Donations go
-            straight to the project.
-          </p>
-          <FundingButtons links={pick.project.fundingLinks} size="lg" />
-          {reasons.length > 0 && (
-            <div className="reasons">
-              {reasons.map((r, i) => (
-                <div className="card reason" key={i}>
-                  {r.avatarUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img className="avatar avatar-sm" src={r.avatarUrl} alt="" width={24} height={24} />
-                  )}
-                  <p className="small">
-                    “{r.reason}” <span className="muted">· {r.login}</span>
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        <PickCover project={pick.project} month={pick.month} voteMonth={pick.voteMonth} voteCount={pick.voteCount} reasons={reasons} />
       ) : (
-        <Intro firstPick={formatMonth(nextMonth(month))} />
+        <Intro firstPick={dayFormat.format(voteClosesAt(month))} />
       )}
 
       <section className="section" id="vote" aria-labelledby="vote-title">
-        <div className="section-head">
+        <div className="ballot-head">
           <div>
-            <h2 id="vote-title">{closed ? "Voting is closed for now" : `Vote for ${formatMonth(nextMonth(month))}`}</h2>
-            <p className="muted">
+            <h2 id="vote-title">{closed ? "Voting reopens on the 1st" : `Vote for ${next}`}</h2>
+            <p>
               {closed
-                ? `Voting for ${formatMonth(month)} is closed. A new vote opens on the 1st.`
-                : `One vote per person. You can change it until voting closes on ${closeFormat.format(voteClosesAt(month))}. ${totalVotes} vote${totalVotes === 1 ? "" : "s"} so far.`}
+                ? `${formatMonth(month)} is closed early. Nominations are still open.`
+                : `One vote each, and you can change it until ${closesOn}. ${totalVotes === 0 ? "No votes yet." : `${totalVotes} vote${totalVotes === 1 ? "" : "s"} so far.`}`}
             </p>
           </div>
           <Link href="/nominate" className="btn btn-outline">
@@ -92,46 +62,50 @@ export default async function Home() {
         </div>
 
         {!user && isAuthConfigured() && !closed && (
-          <div className="card row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
-            <span>Sign in with GitHub to vote. It only reads your public profile.</span>
+          <div className="signin-bar">
+            <p>Sign in with GitHub to vote. Kindling only reads your public profile.</p>
             <SignInButton />
           </div>
         )}
         {tooYoung && (
-          <p className="notice" style={{ marginBottom: 12 }}>
+          <p className="notice" style={{ marginTop: 16 }}>
             Your GitHub account needs to be at least 30 days old to vote. You can still nominate projects.
           </p>
         )}
 
         {ballot.length === 0 ? (
-          <div className="card empty">
-            <p>No projects on the ballot yet.</p>
+          <div className="empty">
+            <p>Nothing on the ballot yet. Nominate a project you rely on and it could be {next}&apos;s pick.</p>
             <Link href="/nominate" className="btn btn-primary">
-              Nominate the first one
+              Nominate a project
             </Link>
           </div>
         ) : (
-          <div className="ballot">
+          <ol className="ballot">
             {ballot.map((project) => {
               const mine = myVote?.projectId === project.id;
               return (
-                <article key={project.id} className={`card ballot-item${mine ? " mine" : ""}`}>
-                  <div className="count">
-                    <strong>{project.votes}</strong>
-                    <span className="muted small">vote{project.votes === 1 ? "" : "s"}</span>
-                  </div>
-                  <div className="info">
-                    <ProjectTitle project={project} />
+                <li key={project.id} className={`entry${mine ? " mine" : ""}`}>
+                  <div>
+                    <EntryName project={project} />
                     {project.description && <p>{project.description}</p>}
-                    <ProjectMeta project={project} />
+                    <div className="meta">{projectMeta(project)}</div>
                   </div>
-                  {user && !closed && !tooYoung && (
+                  <div className="tally">
+                    <Matches count={project.votes} lit={mine} />
+                    <span className="count">
+                      {project.votes === 0 ? "No votes" : `${project.votes} vote${project.votes === 1 ? "" : "s"}`}
+                    </span>
+                  </div>
+                  {user && !closed && !tooYoung ? (
                     <VoteForm projectId={project.id} isMyVote={mine} myReason={mine ? myVote?.reason : null} />
+                  ) : (
+                    <span />
                   )}
-                </article>
+                </li>
               );
             })}
-          </div>
+          </ol>
         )}
       </section>
     </>
@@ -140,16 +114,13 @@ export default async function Home() {
 
 function Intro({ firstPick }: { firstPick?: string }) {
   return (
-    <section className="hero">
-      <div>
-        <div className="eyebrow">A little fuel for good projects</div>
-        <h1>Each month, we pick one open-source project and send it some love.</h1>
-        <p className="lede">
-          Nominate a project you rely on, vote once a month, and the winner gets the spotlight with buttons straight to
-          its own funding page. Kindling never touches the money.
-          {firstPick && ` The first Kindling Pick lands in ${firstPick}.`}
-        </p>
-      </div>
+    <section className="intro">
+      <h1>One open-source project a month, picked by the people who use it.</h1>
+      <p>
+        Nominate something you rely on and vote once a month. The winner gets the spotlight, with buttons straight to its
+        own funding page. Kindling never touches the money.
+        {firstPick && ` The first pick is announced on ${firstPick}.`}
+      </p>
     </section>
   );
 }

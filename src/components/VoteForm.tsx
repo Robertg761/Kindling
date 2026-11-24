@@ -8,11 +8,11 @@ export function VoteForm({ projectId, isMyVote, myReason }: { projectId: number;
 
   if (isMyVote) {
     return (
-      <div className="vote-box">
-        <span className="pill pill-ember">Your vote</span>
-        {myReason && <span className="muted small">“{myReason}”</span>}
+      <div className="vote-box voted">
+        <span className="your-vote">Your vote</span>
+        {myReason && <span className="muted small">&ldquo;{myReason}&rdquo;</span>}
         <form action={withdrawVoteAction}>
-          <button className="btn btn-ghost btn-sm">Withdraw</button>
+          <button className="btn-quiet small">Remove my vote</button>
         </form>
       </div>
     );
@@ -21,18 +21,13 @@ export function VoteForm({ projectId, isMyVote, myReason }: { projectId: number;
   return (
     <form action={action} className="vote-box">
       <input type="hidden" name="projectId" value={projectId} />
-      <input name="reason" className="input input-sm" placeholder="Why? (optional)" maxLength={140} aria-label="Why you're voting (optional)" />
+      <input name="reason" className="input input-sm" placeholder="Why this one? (optional)" maxLength={140} aria-label="Why you're voting for it (optional)" />
       <button className="btn btn-primary btn-sm" disabled={pending}>
-        {pending ? "Saving…" : "Vote"}
+        {pending ? "Voting…" : "Vote"}
       </button>
       {state?.error && (
         <p className="notice notice-error small" role="alert">
           {state.error}
-        </p>
-      )}
-      {state?.message && (
-        <p className="notice small" role="status">
-          {state.message}
         </p>
       )}
     </form>

@@ -5,29 +5,51 @@ export function projectHref(p: { owner: string; name: string }) {
   return `/p/${encodeURIComponent(p.owner)}/${encodeURIComponent(p.name)}`;
 }
 
-export function Flame({ size = 22 }: { size?: number }) {
+/** A single safety match. Lit matches carry a small flame. */
+export function Match({ lit = false, size = 48, faded = false }: { lit?: boolean; size?: number; faded?: boolean }) {
+  const w = Math.round(size * 0.3);
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <defs>
-        <linearGradient id="kindling-flame" x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0" stopColor="#e8590c" />
-          <stop offset="1" stopColor="#ffc078" />
-        </linearGradient>
-      </defs>
-      <path
-        fill="url(#kindling-flame)"
-        d="M12 2c.6 3.2-1.2 4.9-2.8 6.6C7.5 10.4 6 12.1 6 14.8 6 18.2 8.7 21 12 21s6-2.8 6-6.2c0-2.4-1.1-4-2.3-5.2-.2 1.5-.9 2.6-2 3.2.3-3.6-.6-7.6-1.7-10.8Z"
-      />
-      <path fill="#fff4e6" opacity=".85" d="M12 13.5c1.3 1 2.2 2.1 2.2 3.4A2.2 2.2 0 0 1 12 19a2.2 2.2 0 0 1-2.2-2.1c0-1.2.9-2.3 2.2-3.4Z" />
+    <svg width={w} height={size} viewBox="0 0 10 36" aria-hidden="true" style={{ opacity: faded ? 0.35 : 1 }}>
+      <rect x="3.5" y="12" width="3" height="24" rx="0.6" fill="var(--birch)" />
+      <ellipse cx="5" cy="11" rx="3.1" ry="4" fill={lit ? "#3a2a22" : "var(--red)"} />
+      {lit && (
+        <g className="match-flame">
+          <path d="M5 0.5C6.8 3.2 8.4 5 8.4 7.3 8.4 9.4 6.9 10.8 5 10.8S1.6 9.4 1.6 7.3C1.6 5 3.2 3.2 5 0.5Z" fill="var(--flame)" />
+          <path d="M5 4.6C5.9 6 6.6 6.9 6.6 8 6.6 9 5.9 9.7 5 9.7S3.4 9 3.4 8C3.4 6.9 4.1 6 5 4.6Z" fill="#ffe2a8" />
+        </g>
+      )}
     </svg>
   );
 }
 
-export function Avatar({ owner, size = 48 }: { owner: string; size?: number }) {
+/** Votes drawn as matches: one match per vote, up to `max`, then a count. */
+export function Matches({ count, lit = false, max = 10, size = 48 }: { count: number; lit?: boolean; max?: number; size?: number }) {
+  const shown = Math.min(count, max);
+  return (
+    <span className="matches" role="img" aria-label={`${count} vote${count === 1 ? "" : "s"}${lit ? ", including yours" : ""}`}>
+      {shown === 0 ? (
+        <Match size={size} faded />
+      ) : (
+        Array.from({ length: shown }, (_, i) => <Match key={i} size={size} lit={lit && i === shown - 1} />)
+      )}
+      {count > max && <span className="more">+{count - max}</span>}
+    </span>
+  );
+}
+
+export function Wordmark() {
+  return (
+    <>
+      <Match lit size={30} /> Kindling
+    </>
+  );
+}
+
+export function Avatar({ owner, size = 48, round = false }: { owner: string; size?: number; round?: boolean }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      className="avatar"
+      className={`avatar${round ? " avatar-round" : ""}`}
       src={`https://github.com/${encodeURIComponent(owner)}.png?size=${size * 2}`}
       alt=""
       width={size}
@@ -37,19 +59,38 @@ export function Avatar({ owner, size = 48 }: { owner: string; size?: number }) {
   );
 }
 
-export function FundingButtons({ links, size = "md" }: { links: FundingLink[]; size?: "sm" | "md" | "lg" }) {
+/** Button text says what happens on the other side. */
+function fundingText(link: FundingLink) {
+  switch (link.platform) {
+    case "github":
+      return "Sponsor on GitHub";
+    case "open_collective":
+      return "Back on Open Collective";
+    case "ko_fi":
+      return "Support on Ko-fi";
+    case "liberapay":
+      return "Donate on Liberapay";
+    case "buy_me_a_coffee":
+      return "Buy them a coffee";
+    case "polar":
+      return "Fund on Polar";
+    case "patreon":
+      return "Join on Patreon";
+    case "custom":
+      return `Donate at ${link.label}`;
+    default:
+      return `Support on ${link.label}`;
+  }
+}
+
+export function FundingButtons({ links, size = "md", quiet = false }: { links: FundingLink[]; size?: "sm" | "md" | "lg"; quiet?: boolean }) {
   if (!links.length) return null;
+  const sizeClass = size === "lg" ? " btn-lg" : size === "sm" ? " btn-sm" : "";
   return (
     <div className="funding">
       {links.map((link, i) => (
-        <a
-          key={link.url}
-          href={link.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`btn ${i === 0 ? "btn-primary" : "btn-outline"} ${size === "lg" ? "btn-lg" : size === "sm" ? "btn-sm" : ""}`}
-        >
-          {link.label} <span aria-hidden="true">↗</span>
+        <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer" className={`btn ${i === 0 && !quiet ? "btn-primary" : "btn-outline"}${sizeClass}`}>
+          {fundingText(link)}
         </a>
       ))}
     </div>
@@ -59,28 +100,25 @@ export function FundingButtons({ links, size = "md" }: { links: FundingLink[]; s
 const relative = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 
 export function timeAgo(date: Date | null, now = new Date()) {
-  if (!date) return "unknown";
+  if (!date) return "a while ago";
   const days = Math.round((date.getTime() - now.getTime()) / 86_400_000);
   if (Math.abs(days) < 1) return "today";
   if (Math.abs(days) < 31) return relative.format(days, "day");
   return relative.format(Math.round(days / 30), "month");
 }
 
-export function ProjectMeta({ project }: { project: Project }) {
-  return (
-    <div className="meta">
-      <span>★ {project.stars.toLocaleString("en-US")}</span>
-      {project.language && <span>{project.language}</span>}
-      <span>Last push {timeAgo(project.lastPushAt)}</span>
-    </div>
-  );
+export function projectMeta(project: Project) {
+  const parts = [`${project.stars.toLocaleString("en-US")} stars`];
+  if (project.language) parts.push(project.language);
+  parts.push(`pushed ${timeAgo(project.lastPushAt)}`);
+  return parts.join(", ");
 }
 
-export function ProjectTitle({ project, as: Tag = "h3" }: { project: Project; as?: "h1" | "h2" | "h3" }) {
+export function EntryName({ project, as: Tag = "h3" }: { project: Project; as?: "h2" | "h3" }) {
   return (
-    <Tag className="project-title">
+    <Tag className="entry-name">
       <Link href={projectHref(project)}>
-        <span className="muted">{project.owner}/</span>
+        <span className="owner">{project.owner}/</span>
         <wbr />
         {project.name}
       </Link>
@@ -90,7 +128,7 @@ export function ProjectTitle({ project, as: Tag = "h3" }: { project: Project; as
 
 export function SetupNotice() {
   return (
-    <div className="card notice-card">
+    <div className="panel">
       <h2>Almost there</h2>
       <p>
         Kindling needs its environment variables before it can show projects. Copy <code>.env.example</code> to{" "}

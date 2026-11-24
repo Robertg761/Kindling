@@ -6,15 +6,14 @@ export const metadata: Metadata = { title: "About" };
 export default function AboutPage() {
   return (
     <article className="prose">
-      <div className="eyebrow">How it works</div>
-      <h1>Kindling never touches the money.</h1>
+      <h1>How Kindling works</h1>
       <p className="lede">
-        Kindling is a monthly spotlight for open-source projects. We don&apos;t collect donations, hold balances or pay
+        Kindling is a monthly spotlight for open-source projects. It never collects donations, holds balances or pays
         anyone out. Every donate button goes straight to the project&apos;s own GitHub Sponsors, Open Collective, Ko-fi or
         similar page.
       </p>
 
-      <h2>Each month</h2>
+      <h2>Every month</h2>
       <ol>
         <li>
           <strong>Nominate.</strong> Anyone signed in with GitHub can <Link href="/nominate">nominate</Link> up to three
@@ -34,7 +33,7 @@ export default function AboutPage() {
         </li>
       </ol>
 
-      <h2>Why not handle the money?</h2>
+      <h2>Why Kindling doesn&apos;t handle money</h2>
       <p>
         Because projects already have good ways to get paid, and holding other people&apos;s money is where small
         community projects get complicated. Kindling&apos;s job is attention: helping the community agree on who deserves
