@@ -1,12 +1,12 @@
-# ProjectFuel Lite: v1 Spec
+# Kindling: v1 Spec
 
-> Good projects shouldn't run out of fuel.
+> A little fuel for good projects.
 
 ## What it is
 
-A site where the community nominates open-source projects, votes once a month, and the winner becomes **the Fuel Pick** for the next month. The site sends attention and donations straight to the winner's existing funding page (GitHub Sponsors, Open Collective, Ko-fi, Liberapay, Buy Me a Coffee, Polar).
+A site where the community nominates open-source projects, votes once a month, and the winner becomes **the Kindling Pick** for the next month. The site sends attention and donations straight to the winner's existing funding page (GitHub Sponsors, Open Collective, Ko-fi, Liberapay, Buy Me a Coffee, Polar).
 
-**ProjectFuel never touches money.** There's no checkout, no ledger, no payouts and no balances. If a feature needs us to hold or move funds, it's out of scope.
+**Kindling never touches money.** There's no checkout, no ledger, no payouts and no balances. If a feature needs us to hold or move funds, it's out of scope.
 
 ## The one rule
 
@@ -14,7 +14,7 @@ v1 ships before any new docs, charters, decision records or "phases" get written
 
 ## Users
 
-- **Visitors**: browse nominees, see the current Fuel Pick, click through to donate. No account needed.
+- **Visitors**: browse nominees, see the current Kindling Pick, click through to donate. No account needed.
 - **Members**: sign in with GitHub to nominate and vote.
 - **Operator** (Robert): approves or removes nominations and closes the monthly vote.
 
@@ -27,13 +27,13 @@ v1 ships before any new docs, charters, decision records or "phases" get written
 
    If it passes, the nomination waits for operator approval. If it fails, show the specific reason.
 2. **Vote.** Each member gets **one vote per month** and can change it until the vote closes. Equal weight for everyone, and no way to buy votes.
-3. **Close the month.** On the 1st (Vercel Cron, or a manual operator button), the project with the most votes becomes the Fuel Pick. Ties go to whoever reached that count first. Nominees that didn't win carry over to next month with their votes reset.
-4. **Fuel Pick page.** A big feature of the winner with its description, stars, recent activity, a "why people voted" list (optional one-line reasons left with votes), and prominent buttons for each funding link.
-5. **Hall of Fame.** A list of past Fuel Picks with month and vote count.
+3. **Close the month.** On the 1st (Vercel Cron, or a manual operator button), the project with the most votes becomes the Kindling Pick. Ties go to whoever reached that count first. Nominees that didn't win carry over to next month with their votes reset.
+4. **Kindling Pick page.** A big feature of the winner with its description, stars, recent activity, a "why people voted" list (optional one-line reasons left with votes), and prominent buttons for each funding link.
+5. **Hall of Fame.** A list of past Kindling Picks with month and vote count.
 
 ## Pages
 
-- `/`: the current Fuel Pick, the live vote for next month, and a nominate button
+- `/`: the current Kindling Pick, the live vote for next month, and a nominate button
 - `/p/[owner]/[repo]`: a nominee's page
 - `/hall`: past picks
 - `/about`: one short page that says plainly that we don't handle money and links go straight to the project
@@ -67,6 +67,6 @@ Payments of any kind, AI compute grants, cash awards, random draws, contributor 
 - [ ] Sign in with GitHub works in production
 - [ ] Nominate → verify → approve → appears on `/`
 - [ ] Vote, change vote, one vote per month enforced in the database
-- [ ] Closing the month creates a Fuel Pick and resets votes
+- [ ] Closing the month creates a Kindling Pick and resets votes
 - [ ] Funding buttons open the project's real funding pages
 - [ ] Deployed, with 3 to 5 real projects seeded by hand
