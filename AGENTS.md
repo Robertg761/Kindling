@@ -11,4 +11,10 @@ Read `SPEC.md` first. It's the whole plan.
 
 ## Open questions
 
-(none yet)
+Decisions made during the first build that the spec didn't cover. Robert should confirm or change these.
+
+- **Past winners leave the ballot** permanently, so the same project can't win every month. Could become "after 12 months they can return."
+- **Funding source:** the spec mentions the owner's GitHub Sponsors profile. Checking that needs the GraphQL API with auth, so v1 reads `FUNDING.yml` from the repo and falls back to the owner's `.github` repo, which is where GitHub itself looks.
+- **Closing a month early** (admin button) locks voting until the 1st, since votes are grouped by calendar month.
+- **Pending project pages** are visible only to the nominator and operators, so spam never gets a public page.
+- **Months with no votes** produce no pick, and the previous pick stays featured.
