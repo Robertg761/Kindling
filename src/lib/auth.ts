@@ -1,4 +1,5 @@
 import "server-only";
+import { createHmac } from "node:crypto";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth";
 import GitHubProvider from "next-auth/providers/github";
@@ -6,8 +7,19 @@ import { getDb, isDatabaseConfigured } from "@/db";
 import type { User } from "@/db/schema";
 import { getUserByGithubId, upsertUser } from "./core";
 
+/**
+ * Session signing secret. Uses NEXTAUTH_SECRET when set; otherwise derives one from the
+ * GitHub client secret so a deploy only needs one secret pasted. Rotating the GitHub
+ * secret then signs everyone out, which is fine.
+ */
+function sessionSecret(): string | undefined {
+  if (process.env.NEXTAUTH_SECRET) return process.env.NEXTAUTH_SECRET;
+  const github = process.env.GITHUB_SECRET;
+  return github ? createHmac("sha256", github).update("kindling-session-v1").digest("base64url") : undefined;
+}
+
 export function isAuthConfigured() {
-  return Boolean(process.env.GITHUB_ID && process.env.GITHUB_SECRET && process.env.NEXTAUTH_SECRET && isDatabaseConfigured());
+  return Boolean(process.env.GITHUB_ID && process.env.GITHUB_SECRET && isDatabaseConfigured());
 }
 
 const NUMERIC_ID = /^[1-9][0-9]*$/;
@@ -16,6 +28,7 @@ export const authOptions: NextAuthOptions = {
   providers: isAuthConfigured()
     ? [GitHubProvider({ clientId: process.env.GITHUB_ID!, clientSecret: process.env.GITHUB_SECRET! })]
     : [],
+  secret: sessionSecret(),
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   callbacks: {
     async signIn({ account, profile }) {
