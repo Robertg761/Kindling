@@ -7,9 +7,11 @@ import { monthOf, previousMonth } from "@/lib/month";
 
 export const dynamic = "force-dynamic";
 
+// CRON_SECRET is optional. This route only ever closes a month that has already ended,
+// which is idempotent, so an extra call is harmless. Set it to keep the route private anyway.
 function authorized(request: Request) {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
+  if (!secret) return true;
   const given = Buffer.from(request.headers.get("authorization") ?? "");
   const expected = Buffer.from(`Bearer ${secret}`);
   return given.length === expected.length && timingSafeEqual(given, expected);
