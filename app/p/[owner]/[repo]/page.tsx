@@ -51,7 +51,9 @@ export default async function ProjectPage({ params, searchParams }: Props) {
     <>
       {query.nominated && (
         <p className="notice" style={{ marginBottom: 20 }}>
-          Thanks for the nomination. It passed the checks and will show up on the ballot once it's approved.
+          {project.status === "approved"
+            ? "Added. It passed the checks and is on the ballot."
+            : "Thanks for the nomination. It passed the checks and will show up on the ballot once it's approved."}
         </p>
       )}
       {query.exists && (

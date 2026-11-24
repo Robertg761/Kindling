@@ -144,3 +144,15 @@ describe("closing the month", () => {
     expect((await closeVoting(db, "2026-11")).status).toBe("no-votes");
   });
 });
+
+describe("operator nominations", () => {
+  it("can skip the monthly limit and go straight to approved", async () => {
+    const { db, mkUser } = await setup();
+    const op = await mkUser(9);
+    const now = at("2026-11-10T00:00:00Z");
+    for (const n of ["a", "b", "c", "d", "e"]) {
+      const res = await nominate(db, { userId: op.id, repo: fakeRepo(`op-${n}`), now, status: "approved", skipLimit: true });
+      expect(res.ok && res.value.project.status).toBe("approved");
+    }
+  });
+});

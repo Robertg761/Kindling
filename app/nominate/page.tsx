@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getDb, isDatabaseConfigured } from "@/db";
-import { getCurrentUser, isAuthConfigured } from "@/lib/auth";
+import { getCurrentUser, isAuthConfigured, isOperator } from "@/lib/auth";
 import { NOMINATIONS_PER_MONTH, nominationsThisMonth } from "@/lib/core";
 import { ACTIVITY_WINDOW_DAYS } from "@/lib/github";
 import { SignInButton } from "@/components/AuthButtons";
@@ -14,7 +14,8 @@ export default async function NominatePage() {
   if (!isDatabaseConfigured()) return <SetupNotice />;
   const user = await getCurrentUser();
   const used = user ? await nominationsThisMonth(getDb(), user.id, new Date()) : 0;
-  const left = Math.max(0, NOMINATIONS_PER_MONTH - used);
+  const operator = isOperator(user);
+  const left = operator ? Infinity : Math.max(0, NOMINATIONS_PER_MONTH - used);
 
   return (
     <div className="prose">
@@ -38,7 +39,9 @@ export default async function NominatePage() {
           <>
             <NominateForm />
             <p className="small muted" style={{ marginTop: 12, marginBottom: 0 }}>
-              {left} of {NOMINATIONS_PER_MONTH} nominations left this month.
+              {operator
+                ? "You're an operator, so your nominations skip the limit and go straight onto the ballot."
+                : `${left} of ${NOMINATIONS_PER_MONTH} nominations left this month.`}
             </p>
           </>
         )}

@@ -71,13 +71,13 @@ export type NominateOutcome = { project: Project; created: boolean };
 /** Stores a verified repository as a pending nomination. Returns the existing row if it was already nominated. */
 export async function nominate(
   db: Db,
-  input: { userId: number | null; repo: VerifiedRepo; now: Date; status?: "pending" | "approved" },
+  input: { userId: number | null; repo: VerifiedRepo; now: Date; status?: "pending" | "approved"; skipLimit?: boolean },
 ): Promise<Result<NominateOutcome>> {
   const existing = await findExistingProject(db, input.repo);
   if (existing) return ok({ project: existing, created: false });
 
-  // A null user is the operator seeding projects by hand, which skips the monthly limit.
-  if (input.userId !== null && (await nominationsThisMonth(db, input.userId, input.now)) >= NOMINATIONS_PER_MONTH) {
+  // Operators (and the seed script, which has no user) skip the monthly limit.
+  if (!input.skipLimit && input.userId !== null && (await nominationsThisMonth(db, input.userId, input.now)) >= NOMINATIONS_PER_MONTH) {
     return fail(`You've used all ${NOMINATIONS_PER_MONTH} nominations for this month. More open up on the 1st.`);
   }
 

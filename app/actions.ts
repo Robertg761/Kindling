@@ -33,7 +33,15 @@ export async function nominateAction(_prev: FormState, formData: FormData): Prom
   const verified = await verifyRepository(url);
   if (!verified.ok) return { error: verified.reason };
 
-  const result = await nominate(getDb(), { userId: user.id, repo: verified.repo, now: new Date() });
+  // Operator nominations go straight onto the ballot and skip the monthly limit.
+  const operator = isOperator(user);
+  const result = await nominate(getDb(), {
+    userId: user.id,
+    repo: verified.repo,
+    now: new Date(),
+    status: operator ? "approved" : "pending",
+    skipLimit: operator,
+  });
   if (!result.ok) return { error: result.reason };
 
   const { project, created } = result.value;
