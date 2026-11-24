@@ -115,7 +115,7 @@ export default async function Home() {
 function Intro({ firstPick }: { firstPick?: string }) {
   return (
     <section className="intro">
-      <h1>One open-source project a month, picked by the people who use it.</h1>
+      <h1>One open‑source project a month, picked by the people who use it.</h1>
       <p>
         Nominate something you rely on and vote once a month. The winner gets the spotlight, with buttons straight to its
         own funding page. Kindling never touches the money.
