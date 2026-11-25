@@ -4,7 +4,7 @@ Read `SPEC.md` first. It's the whole plan.
 
 - Kindling never holds, moves or processes money. Open Collective holds it and pays winners. Kindling only reads the collective's balance and subscriptions (`src/lib/opencollective.ts`) and records which prizes have been paid. Don't add checkout, card handling or payout code.
 - Build only what `SPEC.md` lists. If something seems missing, add it to "Open questions" at the bottom of this file instead of building it.
-- Don't create new planning docs, ADRs or phase plans. Update `SPEC.md` only when Robert asks.
+- Don't create new planning docs, ADRs or phase plans. `GLOSSARY.md` is the exception: it defines Kindling's terms (member, subscriber, Pick, pot), so use those words in code and copy and add new terms there when they're settled. Update `SPEC.md` only when Robert asks.
 - Keep it small: plain server components and server actions, Drizzle for the DB, no state libraries.
 - `reference/` holds code from the old ProjectFuel repo. Copy what helps into `src/`; don't import from `reference/`.
 - Every DB rule in the spec (one vote per user per month, unique picks per month) is enforced with a constraint, not just in app code.
