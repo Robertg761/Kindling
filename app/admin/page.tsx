@@ -129,11 +129,13 @@ export default async function AdminPage() {
                   : "No votes yet."}{" "}
                 It closes automatically on the 1st.
               </p>
-              <CloseMonthForm
-                month={month}
-                label={`Close ${formatMonth(month)} early`}
-                confirmText={`Close ${formatMonth(month)} now? Winners are decided from today's pot and nobody can vote until the 1st.`}
-              />
+              {!slug && (
+                <CloseMonthForm
+                  month={month}
+                  label={`Close ${formatMonth(month)} early`}
+                  confirmText={`Close ${formatMonth(month)} now? Nobody can vote until the 1st.`}
+                />
+              )}
             </div>
           )}
         </div>

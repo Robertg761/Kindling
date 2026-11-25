@@ -172,6 +172,8 @@ export async function closeMonthAction(_prev: FormState, formData: FormData): Pr
   if (!isMonth(month) || month > monthOf(new Date())) return { error: "You can only close the current month or an earlier one." };
 
   const slug = collectiveSlug();
+  // With real prizes, a month runs its full length so the pot and the 5% share cover the whole month.
+  if (slug && month >= monthOf(new Date())) return { error: "Prize months can't be closed early. It closes on the 1st." };
   let funding = null;
   let voterSlugs: string[] | null = null;
   if (slug) {
