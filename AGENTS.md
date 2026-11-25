@@ -13,9 +13,9 @@ Read `SPEC.md` first. It's the whole plan.
 
 Decisions made during the first build that the spec didn't cover. Robert should confirm or change these.
 
-- **Past winners leave the ballot** permanently, so the same project can't win every month. Could become "after 12 months they can return."
+- **Past winners sit out 12 months** after a paid win, then return to the ballot. Practice-mode picks (no prize) don't count. (Robert, Nov 25)
 - **Funding source:** the spec mentions the owner's GitHub Sponsors profile. Checking that needs the GraphQL API with auth, so v1 reads `FUNDING.yml` from the repo and falls back to the owner's `.github` repo, which is where GitHub itself looks.
-- **Closing a month early** (admin button) locks voting until the 1st, since votes are grouped by calendar month.
+- **Closing a month early** (admin button) is practice mode only and locks voting until the 1st. Prize months always run to the 1st. (Robert, Nov 25)
 - **Pending project pages** are visible only to the nominator and operators, so spam never gets a public page.
 - **Months with no winners** keep the previous picks featured on the home page.
 - **Proving an Open Collective profile:** members add their GitHub link to their OC profile, and Kindling checks it before linking.

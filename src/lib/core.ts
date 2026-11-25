@@ -1,9 +1,9 @@
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, notInArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, notInArray, sql } from "drizzle-orm";
 import { picks, projects, rounds, users, votes, type PickRow, type Project, type Round, type User } from "@/db/schema";
 import type { Db } from "@/db/types";
 import type { VerifiedRepo } from "./github";
 import { breakdown, PRIZE_CENTS, type FundingSnapshot } from "./money";
-import { monthOf, nextMonth, type Month } from "./month";
+import { addMonths, monthOf, nextMonth, type Month } from "./month";
 
 export const MIN_ACCOUNT_AGE_DAYS = 30;
 export const NOMINATIONS_PER_MONTH = 3;
@@ -132,14 +132,25 @@ export async function listProjectsByStatus(db: Db, status: Project["status"]) {
   return db.select().from(projects).where(eq(projects.status, status)).orderBy(asc(projects.createdAt));
 }
 
-/** Project IDs that have already been a Kindling Pick. Past winners leave the ballot. */
-async function pastWinnerIds(db: Db): Promise<number[]> {
-  const rows = await db.selectDistinct({ id: picks.projectId }).from(picks);
+/** How long a project that won a prize stays off the ballot, counted in vote months. */
+export const WINNER_COOLDOWN_MONTHS = 12;
+
+/**
+ * Projects that won a paid prize in the last 12 vote months sit out `voteMonth`'s ballot. A
+ * practice-mode pick (no money) never keeps a project out. A project that won the November 2026
+ * vote is back on the ballot for the November 2027 vote.
+ */
+function recentPaidWin(voteMonth: Month) {
+  return and(gt(picks.amountCents, 0), gt(picks.voteMonth, addMonths(voteMonth, -WINNER_COOLDOWN_MONTHS)), lt(picks.voteMonth, voteMonth));
+}
+
+async function pastWinnerIds(db: Db, voteMonth: Month): Promise<number[]> {
+  const rows = await db.selectDistinct({ id: picks.projectId }).from(picks).where(recentPaidWin(voteMonth));
   return rows.map((r) => r.id);
 }
 
-export async function isPastWinner(db: Db, projectId: number): Promise<boolean> {
-  const [row] = await db.select({ id: picks.id }).from(picks).where(eq(picks.projectId, projectId)).limit(1);
+export async function isPastWinner(db: Db, projectId: number, voteMonth: Month): Promise<boolean> {
+  const [row] = await db.select({ id: picks.id }).from(picks).where(and(eq(picks.projectId, projectId), recentPaidWin(voteMonth))).limit(1);
   return Boolean(row);
 }
 
@@ -153,7 +164,7 @@ export type BallotEntry = Project & { votes: number };
  * count (current subscribers). Without it, every vote counts (practice mode).
  */
 export async function getBallot(db: Db, month: Month, voterSlugs?: string[] | null): Promise<BallotEntry[]> {
-  const winners = await pastWinnerIds(db);
+  const winners = await pastWinnerIds(db, month);
   const counts = db
     .select({ projectId: votes.projectId, n: sql<number>`count(*)::int`.as("n") })
     .from(votes)
@@ -214,7 +225,7 @@ export async function castVote(
 
   const [project] = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
   if (!project || project.status !== "approved") return fail("That project isn't on the ballot.");
-  if (await isPastWinner(db, projectId)) return fail("That project has already been a Kindling Pick.");
+  if (await isPastWinner(db, projectId, month)) return fail("That project won a prize in the last 12 months, so it's sitting this one out.");
 
   const reason = input.reason?.trim().replace(/\s+/g, " ").slice(0, REASON_MAX) || null;
   await db
@@ -311,8 +322,7 @@ export async function closeVoting(
     const money = funding ? breakdown(funding, owed) : null;
     const slots = money ? money.slots : 1;
 
-    const winners = await tx.selectDistinct({ id: picks.projectId }).from(picks);
-    const excluded = winners.map((w) => w.id);
+    const excluded = await pastWinnerIds(tx as unknown as Db, voteMonth);
     const ranked =
       slots > 0
         ? await tx

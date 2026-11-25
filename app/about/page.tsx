@@ -35,7 +35,7 @@ export default function AboutPage() {
         </li>
         <li>
           <strong>Pay out.</strong> Each winner gets {formatUsd(PRIZE_CENTS)} through an Open Collective expense, and stays
-          on Kindling&apos;s past picks. Winners leave the ballot so the prize keeps moving around.
+          on Kindling&apos;s past picks. Winners sit out the next 12 months so the prize keeps moving around.
         </li>
       </ol>
 

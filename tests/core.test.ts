@@ -122,10 +122,10 @@ describe("closing the month", () => {
     expect((await getVoteReasons(db, b.id, "2026-11")).map((r) => r.reason)).toEqual(["saved my weekend"]);
     expect(await getHallOfFame(db)).toHaveLength(1);
 
-    // Winner leaves the ballot; the rest carry over with fresh votes.
+    // A practice pick stays on the ballot; everyone carries over with fresh votes.
     const ballot = await getBallot(db, "2026-12");
-    expect(ballot.map((p) => p.name)).toEqual(["a"]);
-    expect(ballot[0].votes).toBe(0);
+    expect(ballot.map((p) => p.name).sort()).toEqual(["a", "b"]);
+    expect(ballot.every((p) => p.votes === 0)).toBe(true);
   });
 
   it("breaks ties by whoever reached the count first", async () => {
@@ -139,6 +139,26 @@ describe("closing the month", () => {
     await castVote(db, { user: u4, projectId: a.id, now: at("2026-11-06T00:00:00Z"), eligible: true });
     const result = await closeVoting(db, "2026-11", null);
     expect(result.status === "closed" && result.winners[0].project.name).toBe("b");
+  });
+
+  it("keeps practice picks on the ballot; paid winners sit out 12 months", async () => {
+    const { db, mkUser, mkProject } = await setup();
+    const u = await mkUser(1);
+    const a = await mkProject("a", u.id);
+    await castVote(db, { user: u, projectId: a.id, now: at("2026-11-03T00:00:00Z"), eligible: true });
+    const practice = await closeVoting(db, "2026-11", null);
+    expect(practice.status === "closed" && practice.winners[0].amountCents).toBe(0);
+    expect((await getBallot(db, "2026-12")).map((p) => p.name)).toEqual(["a"]);
+
+    await castVote(db, { user: u, projectId: a.id, now: at("2026-12-03T00:00:00Z"), eligible: true });
+    const paid = await closeVoting(db, "2026-12", { balanceCents: 20_000, netReceivedCents: 0 });
+    expect(paid.status === "closed" && paid.winners.map((w) => [w.project.name, w.amountCents])).toEqual([["a", 20_000]]);
+    expect(await getBallot(db, "2027-01")).toEqual([]);
+    expect((await castVote(db, { user: u, projectId: a.id, now: at("2027-01-03T00:00:00Z"), eligible: true })).ok).toBe(false);
+
+    // Back after 12 vote months: the December 2026 winner returns for the December 2027 vote.
+    expect(await getBallot(db, "2027-11")).toEqual([]);
+    expect((await getBallot(db, "2027-12")).map((p) => p.name)).toEqual(["a"]);
   });
 
   it("ignores removed projects and handles months with no votes", async () => {
