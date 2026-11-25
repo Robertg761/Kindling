@@ -9,6 +9,20 @@ Read `SPEC.md` first. It's the whole plan.
 - `reference/` holds code from the old ProjectFuel repo. Copy what helps into `src/`; don't import from `reference/`.
 - Every DB rule in the spec (one vote per user per month, unique picks per month) is enforced with a constraint, not just in app code.
 
+## Agent skills
+
+### Issue tracker
+
+Issues live in this repo's GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `SPEC.md` and `GLOSSARY.md` at the root, no ADRs. See `docs/agents/domain.md`.
+
 ## Open questions
 
 Decisions made during the first build that the spec didn't cover. Robert should confirm or change these.
