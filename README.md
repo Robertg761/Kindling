@@ -2,14 +2,14 @@
 
 > A little fuel for good projects.
 
-Kindling is a community-funded pot for open-source projects. Subscribers pay $5 a month or more into the Kindling collective on [Open Collective](https://opencollective.com), vote once a month, and every $200 in the pot becomes a prize for a project at the top of the vote. Open Collective's fiscal host holds the money and pays winners through public expenses. Kindling's code never holds, moves or processes money; it only reads the collective's balance and subscriptions.
+Kindling is a community-funded pot for open-source projects. Subscribers pay $5 a month or more into the Kindling collective on [Open Collective](https://opencollective.com), vote once a month, and every $200 in the pot becomes a prize for a project at the top of the vote. Each winning project is a Kindling Pick. Open Collective's fiscal host holds the money and pays winners through public expenses. Kindling's code never holds, moves or processes money; it only reads the collective's balance and subscriptions.
 
 Live at https://kindling-oss.vercel.app. See [`SPEC.md`](SPEC.md) for the v1 plan and [`AGENTS.md`](AGENTS.md) for rules when working on the code.
 
 ## How it works
 
 - **Nominate.** Members sign in with GitHub and nominate up to 3 public repos a month. A repo qualifies if it isn't a fork, archived or disabled, had a push in the last 60 days, and has a `FUNDING.yml` (in the repo or the owner's `.github` repo). The operator approves each nomination at `/admin`.
-- **Subscribe and vote.** Subscribers link their Open Collective profile (by adding their GitHub URL to it) and get one vote a month, which they can change until the month ends. Every vote counts the same no matter how much someone pays. Only current subscribers' votes count at close.
+- **Subscribe and vote.** A member is anyone signed in with GitHub; a subscriber is a member with a current Open Collective subscription. Subscribers link their Open Collective profile (by adding their GitHub URL to it) and get one vote a month, which they can change until the month ends. Every vote counts the same no matter how much someone pays. Only current subscribers' votes count at close.
 - **Close the month.** On the 1st, a Vercel Cron job closes last month's vote and reads the collective:
 
   ```
@@ -18,13 +18,13 @@ Live at https://kindling-oss.vercel.app. See [`SPEC.md`](SPEC.md) for the v1 pla
         - operator share (5% of the month's income after fees)
   ```
 
-  Every $200 in the pot is one winner, taken from the top of the vote. Ties at the cutoff go to the project that reached its count first. Anything under $200 rolls over to next month.
-- **Pay out.** The fiscal host pays each winner $200 through an Open Collective expense, and the operator marks it paid in `/admin`. Winners sit out the next 12 months, then return to the ballot.
+  Every $200 in the pot is one Pick, taken from the top of the vote, so a month can have several Picks. Ties at the cutoff go to the project that reached its count first. Anything under $200 rolls over to next month.
+- **Pay out.** The fiscal host pays each Pick $200 through an Open Collective expense, and the operator marks it paid in `/admin`. Picks sit out the next 12 months, then return to the ballot.
 - **Operator share.** The operator keeps 5% of income after fees for running Kindling, paid as a public expense and disclosed on `/about`, `/subscribe` and in the footer. It will be reviewed at 200 subscribers, with a month's notice before any change.
 
 ### Practice mode
 
-Until `KINDLING_OC_SLUG` is set, the site runs in practice mode: any signed-in member whose GitHub account is at least 30 days old can vote, the single top project is picked each month, and there's no prize. Practice picks don't keep a project off later prize ballots.
+Until `KINDLING_OC_SLUG` is set, the site runs in practice mode (it's switched on the 1st, right after a close, so a month never changes rules partway through): any signed-in member whose GitHub account is at least 30 days old can vote, each month has exactly one Pick, and there's no prize. Practice picks don't keep a project off later prize ballots.
 
 ## Stack
 
