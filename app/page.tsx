@@ -1,3 +1,4 @@
+import { collectiveSlug } from "@/lib/opencollective";
 import Link from "next/link";
 import { getDb, isDatabaseConfigured } from "@/db";
 import { getCurrentUser, isAuthConfigured } from "@/lib/auth";
@@ -73,7 +74,7 @@ export default async function Home() {
             <p>
               {closed
                 ? `${formatMonth(month)} is closed early. Nominations are still open.`
-                : `One vote per ${voterSlugs ? "subscriber" : "member"}, and you can change it until ${closesOn}. ${totalVotes === 0 ? "No votes yet." : `${totalVotes} vote${totalVotes === 1 ? "" : "s"} so far.`}`}
+                : `One vote per ${collectiveSlug() ? "subscriber" : "member"}, and you can change it until ${closesOn}. ${totalVotes === 0 ? "No votes yet." : `${totalVotes} vote${totalVotes === 1 ? "" : "s"} so far.`}`}
             </p>
           </div>
           <Link href="/nominate" className="btn btn-outline">
@@ -83,7 +84,7 @@ export default async function Home() {
 
         {!user && isAuthConfigured() && !closed && (
           <div className="signin-bar">
-            <p>Subscribers vote. Sign in with GitHub to vote or nominate. Kindling only reads your public profile.</p>
+            <p>{collectiveSlug() ? "Subscribers vote. " : ""}Sign in with GitHub to vote or nominate. Kindling only reads your public profile.</p>
             <SignInButton />
           </div>
         )}

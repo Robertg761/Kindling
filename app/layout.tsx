@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: { default: "Kindling: a little fuel for good projects", template: "%s | Kindling" },
   description:
-    "Each month the community picks an open-source project to support, and donations go straight to it. Kindling never touches the money.",
+    "Subscribers pool $5 a month and vote on which open-source projects get it. Every $200 in the pot funds another Pick, paid out in the open through Open Collective.",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

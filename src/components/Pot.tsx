@@ -16,7 +16,7 @@ export async function Pot({ month, subscribed = false }: { month: Month; subscri
         <div>
           <h2>Practice round</h2>
           <p>
-            Subscriptions open soon. Until then the vote picks {next}&apos;s spotlight, with no prize money. Once they open,
+            Subscriptions open soon. Until then the vote picks {next}&apos;s Pick, with no prize money. Once they open,
             subscribers fund the pot and every {formatUsd(PRIZE_CENTS)} picks another winner.
           </p>
         </div>

@@ -1,3 +1,4 @@
+import { collectiveSlug } from "@/lib/opencollective";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDb, isDatabaseConfigured } from "@/db";
@@ -108,7 +109,7 @@ export default async function ProjectPage({ params, searchParams }: Props) {
             <h2 id="vote-title">Vote for {formatMonth(nextMonth(month))}</h2>
             <p>
               {votes === 0 ? "No votes yet." : `${votes} vote${votes === 1 ? "" : "s"} so far.`}{" "}
-              {closed ? "This month's vote is closed." : "One vote per subscriber per month."}
+              {closed ? "This month's vote is closed." : `One vote per ${collectiveSlug() ? "subscriber" : "member"} per month.`}
             </p>
           </div>
           {canVote ? (

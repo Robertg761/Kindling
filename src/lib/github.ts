@@ -167,7 +167,7 @@ export async function verifyRepository(
     if (fundingLinks.length === 0) {
       return {
         ok: false,
-        reason: "That project has no funding links yet. Kindling sends donations straight to projects, so it needs a .github/FUNDING.yml.",
+        reason: "That project has no funding links yet. Kindling links to each project's own funding page, so it needs a .github/FUNDING.yml.",
       };
     }
 
